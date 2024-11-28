@@ -1,0 +1,183 @@
+import os
+import requests
+import json
+import random
+import time
+from colorama import Fore, Style, init
+from cfonts import render
+import argparse
+import urllib.parse
+
+# Initialize colorama and random color options
+init(autoreset=True)
+available_colors = [Fore.GREEN, Fore.RED, Fore.YELLOW, Fore.CYAN, Fore.MAGENTA, Fore.WHITE]
+
+# Developer details
+developer_name = "Ismail"
+developer_channel = "https://www.example.com"  # Placeholder for the developer's link
+
+# Helper function to print the developer details in styled format
+def print_welcome_message():
+    print(render(f"{developer_name}", colors=['green', 'yellow'], align='center'))
+    print(Fore.GREEN + Style.BRIGHT + "Welcome to the YesCoin Bot")
+    print(Fore.GREEN + Style.BRIGHT + f"Developer: {developer_name}")
+    print(Fore.YELLOW + Style.BRIGHT + f"Join Developer Channel: {developer_channel}")
+    print("""
+╔━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╗ 
+\33[0;42m Developer : Ismail  ✔ \033[0;92m
+\33[0;41mDeveloper Channel : {developer_channel} ✔ \033[0;92m
+╚━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╝
+""")
+
+# Fetch headers with authorization token
+def get_headers(token):
+    return {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+    }
+
+# Function to fetch game information (like balance, chest, etc.)
+def fetch_game_info(token):
+    url = 'https://api.yescoin.gold/game/info'
+    headers = get_headers(token)
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Error fetching game info - {e}")
+        return None
+
+# Function to collect coins from special box
+def collect_from_special_box(token, box_type, coin_count):
+    url = 'https://api.yescoin.gold/game/collectSpecialBoxCoin'
+    headers = get_headers(token)
+    data = json.dumps({"boxType": box_type, "coinCount": coin_count})
+    try:
+        response = requests.post(url, headers=headers, data=data)
+        response.raise_for_status()
+        result = response.json()
+        if result['code'] == 0:
+            collected_amount = result['data']['collectAmount']
+            print(f"{random.choice(available_colors) + Style.BRIGHT}\r[ Collect ] : Collected {collected_amount} coins")
+            return collected_amount
+        else:
+            print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Failed to collect coins: {result['message']}")
+            return 0
+    except Exception as e:
+        print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Error while collecting coins - {e}")
+        return 0
+
+# Function to upgrade account level
+def upgrade_account(token, current_level, target_level):
+    url = 'https://api.yescoin.gold/build/levelUp'
+    headers = get_headers(token)
+    while current_level < target_level:
+        data = json.dumps({"upgradeType": "multiValue"})  # Example upgrade type
+        try:
+            response = requests.post(url, headers=headers, data=data)
+            response.raise_for_status()
+            result = response.json()
+            if result['code'] == 0:
+                current_level += 1
+                print(f"{random.choice(available_colors) + Style.BRIGHT}\r[ Upgrade ] : Upgraded to level {current_level}")
+            else:
+                print(f"{Fore.RED + Style.BRIGHT}\r[ Upgrade ] : Failed to upgrade - {result['message']}")
+                break
+        except Exception as e:
+            print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Error upgrading account - {e}")
+            break
+    if current_level >= target_level:
+        print(f"{random.choice(available_colors) + Style.BRIGHT}\r[ Upgrade ] : Already at target level {target_level}")
+
+# Function to process an individual account
+def process_account(token):
+    print(f"{Fore.GREEN + Style.BRIGHT}\r[ Processing ] : Started processing account...")
+    game_info = fetch_game_info(token)
+    if game_info:
+        print(f"{Fore.GREEN + Style.BRIGHT}\r[ Info ] : Game Info: {game_info}")
+        # Collect coins
+        total_collected = 0
+        for _ in range(10):  # Example: Collect 10 times
+            total_collected += collect_from_special_box(token, 2, 240)  # Example box type and coin count
+        print(f"{Fore.GREEN + Style.BRIGHT}\r[ Result ] : Total Coins Collected: {total_collected}")
+    else:
+        print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : No game info available.")
+
+# Function to read and process multiple accounts from a file
+def process_multiple_accounts():
+    with open('accounts.txt', 'r') as file:
+        accounts = file.readlines()
+    
+    for account_data in accounts:
+        token = account_data.strip()
+        if token:
+            try:
+                process_account(token)
+            except Exception as e:
+                print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Error processing account {token} - {e}")
+
+# Function to fetch user info like token, nickname etc.
+def get_token_from_payload(payload):
+    url = 'https://api-backend.yescoin.gold/user/login'
+    headers = {
+        'accept': 'application/json, text/plain, */*',
+        'accept-language': 'en-US,en;q=0.9',
+        'cache-control': 'no-cache',
+        'content-type': 'application/json',
+        'origin': 'https://www.yescoin.gold',
+        'pragma': 'no-cache',
+        'priority': 'u=1, i',
+        'referer': 'https://www.yescoin.gold/',
+        'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Microsoft Edge";v="126", "Microsoft Edge WebView2";v="126"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': 'Windows',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0'
+    }
+    data = json.dumps({"code": payload})
+    try:
+        response = requests.post(url, headers=headers, data=data)
+        response.raise_for_status()
+        result = response.json()
+        if result['code'] == 0:
+            return result['data']['token']
+        else:
+            raise Exception("Failed to get token")
+    except Exception as e:
+        print(f"{Fore.RED + Style.BRIGHT}\r[ Error ] : Error while fetching token - {e}")
+        return None
+
+# Argument parser for customizable functionality
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='YesCoin Bot')
+    parser.add_argument('--target-level', type=int, default=10, help='Target level for account upgrades')
+    parser.add_argument('--collect', action='store_true', help='Enable coin collection')
+    parser.add_argument('--multi', action='store_true', help='Enable multiValue upgrade')
+    parser.add_argument('--fill', action='store_true', help='Enable fillRate upgrade')
+    parser.add_argument('--max-level', type=int, default=5, help='Maximum level for upgrades')
+    parser.add_argument('--file', type=str, default='accounts.txt', help='File containing account tokens')
+    return parser.parse_args()
+
+# Main function
+def main():
+    args = parse_arguments()
+    print_welcome_message()
+
+    if args.collect:
+        process_multiple_accounts()
+
+    if args.multi:
+        for _ in range(5):
+            print(f"{random.choice(available_colors) + Style.BRIGHT}\r[ Upgrade ] : Starting multiValue upgrade...")
+            upgrade_account(token="your_token_here", current_level=1, target_level=args.max_level)
+
+    if args.fill:
+        for _ in range(5):
+            print(f"{random.choice(available_colors) + Style.BRIGHT}\r[ Upgrade ] : Starting fillRate upgrade...")
+            upgrade_account(token="your_token_here", current_level=1, target_level=args.max_level)
+
+    print(f"\n{random.choice(available_colors)+Style.BRIGHT}========={Fore.WHITE+Style.BRIGHT} All accounts processed successfully! {Fore.GREEN+Style.BRIGHT}=========")
+
+if __name__ == '__main__':
+    main()
